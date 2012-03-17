@@ -1,0 +1,54 @@
+From 88c47fc42250bf8f9a1c863016b9145fec7a7c45 Mon Sep 17 00:00:00 2001
+From: Jesse J. Cook <code.crashenx@gmail.com>
+Date: Thu, 15 Mar 2012 22:18:44 -0500
+Subject: [PATCH 1/2] Allow relative path for qemu backing file
+
+This patch enables the relative backing file path support provided by
+qemu-img create.
+
+If a relative path is specified for the backing file, it is converted
+to an absolute path using the storage pool path. The absolute path is
+used to verify that the backing file exists. If the backing file exists,
+the relative path is allowed and will be provided to qemu-img create.
+---
+ src/storage/storage_backend.c |   17 ++++++++++++++++-
+ 1 files changed, 16 insertions(+), 1 deletions(-)
+
+diff --git a/src/storage/storage_backend.c b/src/storage/storage_backend.c
+index 1fe7ba6..932eb65 100644
+--- a/src/storage/storage_backend.c
++++ b/src/storage/storage_backend.c
+@@ -667,6 +667,8 @@ virStorageBackendCreateQemuImg(virConnectPtr conn,
+     }
+ 
+     if (vol->backingStore.path) {
++        int accessRetCode = -1;
++        char *absolutePath = NULL;
+ 
+         /* XXX: Not strictly required: qemu-img has an option a different
+          * backing store, not really sure what use it serves though, and it
+@@ -687,7 +689,20 @@ virStorageBackendCreateQemuImg(virConnectPtr conn,
+                                   vol->backingStore.format);
+             return -1;
+         }
+-        if (access(vol->backingStore.path, R_OK) != 0) {
++
++        /* Convert relative backing store paths to absolute paths for access
++         * validation.
++         */
++        if ('/' != *(vol->backingStore.path) &&
++            virAsprintf(&absolutePath, "%s/%s", pool->def->target.path,
++                        vol->backingStore.path) < 0) {
++            virReportOOMError();
++            return -1;
++        }
++        accessRetCode = access(absolutePath ? absolutePath
++                               : vol->backingStore.path, R_OK);
++        VIR_FREE(absolutePath);
++        if (accessRetCode != 0) {
+             virReportSystemError(errno,
+                                  _("inaccessible backing store volume %s"),
+                                  vol->backingStore.path);
+-- 
+1.7.2.5
+
