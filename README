@@ -1,2 +1,15 @@
-This repository adds a few patches not in the Debian Squeeze version of
-libvirt.
+This repository adds patches not in the Debian Squeeze version of libvirt.
+
+Run the build-package script to build the patched packages. No special
+privileges are required.
+
+The build-package script attempts to patch the version of libvirt in whatever
+repository your apt sources file is pointing at. You should build the package
+from an environment where the apt sources file is pointing to Debian's repos.
+
+After running the build-package script the patched packages and archive
+containing the debian config and source code can be found in the build
+directory.
+
+Tested on:
+  0.8.3-5+squeeze2

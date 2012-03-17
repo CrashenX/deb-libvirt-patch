@@ -1,0 +1,28 @@
+#!/bin/bash
+
+mkdir build || exit 1
+cd build || exit 1
+
+# Pull source
+apt-get source libvirt || exit 1
+
+cd libvirt-* || exit 1
+
+# Apply patches
+dch -n 'Patches applied:' || exit 1
+for i in `ls -1 ../../*.patch | sort`
+do
+    patch -p1 <$i || exit 1
+    DEBFULLNAME="Jesse J. Cook" \
+       DEBEMAIL="code.crashenx@gmail.com" \
+       dch -a "$(cat $i | egrep "^Subject" | cut -d ']' -f 2)" || exit 1
+done
+
+# Create patched archive (contains source)
+src_dir=$(basename $(pwd))
+tar -C .. -czf ../$src_dir.patched.tar.gz $src_dir || exit 1
+
+# Build package
+debuild -us -uc || exit 1
+
+exit 0
