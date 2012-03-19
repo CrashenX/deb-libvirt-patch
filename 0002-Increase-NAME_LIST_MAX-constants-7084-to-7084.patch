@@ -1,7 +1,7 @@
-From 60534b5c6488feb7a106332b857ed4e3a7420d36 Mon Sep 17 00:00:00 2001
+From 36a65e1ca575a5db99b51ce38e421b1aa375e172 Mon Sep 17 00:00:00 2001
 From: Jesse J. Cook <code.crashenx@gmail.com>
-Date: Sat, 17 Mar 2012 09:38:20 -0500
-Subject: [PATCH 2/2] increase NAME_LIST_MAX constants <7084 to 7084
+Date: Mon, 19 Mar 2012 15:41:33 -0500
+Subject: [PATCH 2/2] Increase NAME_LIST_MAX constants <7084 to 7084
 
 Using uuid strings as names (37 bytes):
 
@@ -13,9 +13,41 @@ allows 7084 names to be squeezed into a RPC message while supporting
 
 REMOTE_MESSAGE_PAYLOAD_MAX / 37 = 7084
 ---
+ src/remote/remote_protocol.h |   14 +++++++-------
  src/remote/remote_protocol.x |   14 +++++++-------
- 1 files changed, 7 insertions(+), 7 deletions(-)
+ 2 files changed, 14 insertions(+), 14 deletions(-)
 
+diff --git a/src/remote/remote_protocol.h b/src/remote/remote_protocol.h
+index 4ec0895..052f2c4 100644
+--- a/src/remote/remote_protocol.h
++++ b/src/remote/remote_protocol.h
+@@ -33,19 +33,19 @@ typedef char *remote_nonnull_string;
+ 
+ typedef remote_nonnull_string *remote_string;
+ #define REMOTE_DOMAIN_ID_LIST_MAX 16384
+-#define REMOTE_DOMAIN_NAME_LIST_MAX 1024
++#define REMOTE_DOMAIN_NAME_LIST_MAX 7084
+ #define REMOTE_CPUMAP_MAX 256
+ #define REMOTE_VCPUINFO_MAX 2048
+ #define REMOTE_CPUMAPS_MAX 16384
+ #define REMOTE_MIGRATE_COOKIE_MAX 256
+-#define REMOTE_NETWORK_NAME_LIST_MAX 256
+-#define REMOTE_INTERFACE_NAME_LIST_MAX 256
+-#define REMOTE_DEFINED_INTERFACE_NAME_LIST_MAX 256
+-#define REMOTE_STORAGE_POOL_NAME_LIST_MAX 256
+-#define REMOTE_STORAGE_VOL_NAME_LIST_MAX 1024
++#define REMOTE_NETWORK_NAME_LIST_MAX 7084
++#define REMOTE_INTERFACE_NAME_LIST_MAX 7084
++#define REMOTE_DEFINED_INTERFACE_NAME_LIST_MAX 7084
++#define REMOTE_STORAGE_POOL_NAME_LIST_MAX 7084
++#define REMOTE_STORAGE_VOL_NAME_LIST_MAX 7084
+ #define REMOTE_NODE_DEVICE_NAME_LIST_MAX 16384
+ #define REMOTE_NODE_DEVICE_CAPS_LIST_MAX 16384
+-#define REMOTE_NWFILTER_NAME_LIST_MAX 1024
++#define REMOTE_NWFILTER_NAME_LIST_MAX 7084
+ #define REMOTE_DOMAIN_SCHEDULER_PARAMETERS_MAX 16
+ #define REMOTE_NODE_MAX_CELLS 1024
+ #define REMOTE_AUTH_SASL_DATA_MAX 65536
 diff --git a/src/remote/remote_protocol.x b/src/remote/remote_protocol.x
 index 62450c4..75d278e 100644
 --- a/src/remote/remote_protocol.x

@@ -1,6 +1,6 @@
-From 88c47fc42250bf8f9a1c863016b9145fec7a7c45 Mon Sep 17 00:00:00 2001
+From db02dff41eb46658edbf9210767d44238eaf06f5 Mon Sep 17 00:00:00 2001
 From: Jesse J. Cook <code.crashenx@gmail.com>
-Date: Thu, 15 Mar 2012 22:18:44 -0500
+Date: Mon, 19 Mar 2012 15:33:07 -0500
 Subject: [PATCH 1/2] Allow relative path for qemu backing file
 
 This patch enables the relative backing file path support provided by
