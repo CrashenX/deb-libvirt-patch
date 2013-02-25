@@ -1,0 +1,68 @@
+From 0fad3037ff0fb97245a4e379521ee4394688da8a Mon Sep 17 00:00:00 2001
+From: "Jesse J. Cook" <jcook@camber.com>
+Date: Mon, 25 Feb 2013 16:57:04 -0600
+Subject: [PATCH] Increase NAME_LIST_MAX constants <7084 to 7084
+
+Using uuid strings as names (37 bytes):
+
+e.g.
+  "12345678-1234-1234-1234-123456789012\0"
+
+allows 7084 names to be squeezed into a RPC message while supporting
+"practical uniqueness" and readability
+
+src/rpc/virnetprotocol.x:VIR_NET_MESSAGE_PAYLOAD_MAX / 37 = 7084
+---
+ src/remote/remote_protocol.x |   14 +++++++-------
+ 1 file changed, 7 insertions(+), 7 deletions(-)
+
+diff --git a/src/remote/remote_protocol.x b/src/remote/remote_protocol.x
+index 2d57247..ea1b83a 100644
+--- a/src/remote/remote_protocol.x
++++ b/src/remote/remote_protocol.x
+@@ -79,7 +79,7 @@ typedef remote_nonnull_string *remote_string;
+ const REMOTE_DOMAIN_ID_LIST_MAX = 16384;
+ 
+ /* Upper limit on lists of domain names. */
+-const REMOTE_DOMAIN_NAME_LIST_MAX = 1024;
++const REMOTE_DOMAIN_NAME_LIST_MAX = 7084;
+ 
+ /* Upper limit on cpumap (bytes) passed to virDomainPinVcpu. */
+ const REMOTE_CPUMAP_MAX = 256;
+@@ -94,19 +94,19 @@ const REMOTE_CPUMAPS_MAX = 16384;
+ const REMOTE_MIGRATE_COOKIE_MAX = 16384;
+ 
+ /* Upper limit on lists of network names. */
+-const REMOTE_NETWORK_NAME_LIST_MAX = 256;
++const REMOTE_NETWORK_NAME_LIST_MAX = 7084;
+ 
+ /* Upper limit on lists of interface names. */
+-const REMOTE_INTERFACE_NAME_LIST_MAX = 256;
++const REMOTE_INTERFACE_NAME_LIST_MAX = 7084;
+ 
+ /* Upper limit on lists of defined interface names. */
+-const REMOTE_DEFINED_INTERFACE_NAME_LIST_MAX = 256;
++const REMOTE_DEFINED_INTERFACE_NAME_LIST_MAX = 7084;
+ 
+ /* Upper limit on lists of storage pool names. */
+-const REMOTE_STORAGE_POOL_NAME_LIST_MAX = 256;
++const REMOTE_STORAGE_POOL_NAME_LIST_MAX = 7084;
+ 
+ /* Upper limit on lists of storage vol names. */
+-const REMOTE_STORAGE_VOL_NAME_LIST_MAX = 1024;
++const REMOTE_STORAGE_VOL_NAME_LIST_MAX = 7084;
+ 
+ /* Upper limit on lists of node device names. */
+ const REMOTE_NODE_DEVICE_NAME_LIST_MAX = 16384;
+@@ -115,7 +115,7 @@ const REMOTE_NODE_DEVICE_NAME_LIST_MAX = 16384;
+ const REMOTE_NODE_DEVICE_CAPS_LIST_MAX = 16384;
+ 
+ /* Upper limit on lists of network filter names. */
+-const REMOTE_NWFILTER_NAME_LIST_MAX = 1024;
++const REMOTE_NWFILTER_NAME_LIST_MAX = 7084;
+ 
+ /* Upper limit on list of scheduler parameters. */
+ const REMOTE_DOMAIN_SCHEDULER_PARAMETERS_MAX = 16;
+-- 
+1.7.10.4
+
