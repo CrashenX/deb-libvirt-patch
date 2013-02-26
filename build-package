@@ -1,5 +1,8 @@
 #!/bin/bash
 
+NAME="Jesse J. Cook"
+EMAIL="jesse.j.cook@member.fsf.org"
+
 mkdir build || exit 1
 cd build || exit 1
 
@@ -9,12 +12,14 @@ apt-get source libvirt || exit 1
 cd libvirt-* || exit 1
 
 # Apply patches
-dch -n 'Patches applied:' || exit 1
+DEBFULLNAME=$NAME \
+    DEBEMAIL=$EMAIL \
+    dch -n 'Patches applied:' || exit 1
 for i in `ls -1 ../../*.patch | sort`
 do
     patch -p1 <$i || exit 1
-    DEBFULLNAME="Jesse J. Cook" \
-       DEBEMAIL="code.crashenx@gmail.com" \
+    DEBFULLNAME=$NAME \
+       DEBEMAIL=$EMAIL \
        dch -a "$(cat $i | egrep "^Subject" | cut -d ']' -f 2)" || exit 1
 done
 
