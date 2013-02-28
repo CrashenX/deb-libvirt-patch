@@ -5,7 +5,7 @@ use IPC::Run3;
 use File::Copy;
 
 my $NAME='Jesse J. Cook';
-my $EMAIL='jesse.j.cook@member.fsf.org';
+my $EMAIL='jcook@camber.com';
 my $DCHENV="DEBFULLNAME=\"$NAME\" DEBEMAIL=\"$EMAIL\"";
 my $PATCHES=getcwd;
 
