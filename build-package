@@ -67,11 +67,18 @@ while(readdir $dh) {
     my $patch_name = "";
     ($patch_name = $patch_subject) =~ s/\r|\n//g;
     ($patch_name = $patch_name) =~ s/ /-/g;
-    @args = ("dpkg-source", "--commit", "--auto-commit",
-        ".", "$patch_name", "$patch_file");
-    0 == system(@args) or die "'@args' returned non-zero return code";
+    # @arg style calls don't play nice with ENV vars
+    # /bin/true is acting as a non-interactive editor
+    my $cmd = "EDITOR=/bin/true \\
+        dpkg-source --commit --auto-commit . '$patch_name' $patch_file";
+    0 == system($cmd) or die "'$cmd' returned non-zero return code";
+
+    $cmd = "$DCHENV dch -n \"$patch_subject\n$patch_body\"";
+    0 == system($cmd) or die "'$cmd' returned non-zero return code";
 }
 closedir $dh;
+my $cmd = "$DCHENV dch -r \"\""; # non-interactive promotion to unstable
+0 == system($cmd) or die "'$cmd' returned non-zero return code";
 
 # Build package
 @args = ("debuild", "-us", "-uc");
