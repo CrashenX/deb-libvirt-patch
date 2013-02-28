@@ -1,33 +1,80 @@
-#!/bin/bash
+#!/usr/bin/perl -w
+use strict;
+use Cwd;
+use IPC::Run3;
+use File::Copy;
 
-NAME="Jesse J. Cook"
-EMAIL="jesse.j.cook@member.fsf.org"
+my $NAME='Jesse J. Cook';
+my $EMAIL='jesse.j.cook@member.fsf.org';
+my $DCHENV="DEBFULLNAME=\"$NAME\" DEBEMAIL=\"$EMAIL\"";
+my $PATCHES=getcwd;
 
-mkdir build || exit 1
-cd build || exit 1
+my $source_path = "";
+my $dh;
+
+mkdir "build" or die $!;
+chdir "build" or die $!;
 
 # Pull source
-apt-get source libvirt || exit 1
+my @args = ("apt-get", "source", "libvirt");
+0 == system(@args) or die "system '@args' failed: $?";
 
-cd libvirt-* || exit 1
+opendir($dh, '.') or die $!;
+while(readdir $dh) {
+    if($_ =~ /^libvirt-/) {
+        $source_path = $_;
+        last;
+    }
+}
+closedir $dh;
+
+if("" eq $source_path) {
+    die "Source directory not found";
+}
+chdir $source_path;
 
 # Apply patches
-DEBFULLNAME=$NAME \
-    DEBEMAIL=$EMAIL \
-    dch -n 'Patches applied:' || exit 1
-for i in `ls -1 ../../*.patch | sort`
-do
-    patch -p1 <$i || exit 1
-    DEBFULLNAME=$NAME \
-       DEBEMAIL=$EMAIL \
-       dch -a "$(cat $i | egrep "^Subject" | cut -d ']' -f 2)" || exit 1
-done
+my $count = 0;
+opendir($dh, $PATCHES) or die $!;
+while(readdir $dh) {
+    next unless $_ =~ /\.patch$/;
 
-# Create patched archive (contains source)
-src_dir=$(basename $(pwd))
-tar -C .. -czf ../$src_dir.patched.tar.gz $src_dir || exit 1
+    my $patch_file = $_;
+    my $patch_subject = "";
+    my $patch_body = "";
+
+    copy("$PATCHES/$patch_file", "$patch_file");
+    $patch_file = getcwd . "/$patch_file";
+    open FILE, "<$patch_file" or die $!;
+    while(<FILE>) {
+        next unless $_ =~ /^Subject:/;
+        ($patch_subject = $_) =~ s/^Subject:\s*//;
+        last;
+    }
+    while(<FILE>) {
+        last if $_ =~ /^---\n$/;
+        $patch_body .= $_;
+    }
+    close FILE;
+
+    print $patch_subject;
+    print $patch_body;
+
+    @args = ("patch", "-p1");
+    run3 \@args, "$patch_file" or die $!;
+    0 == $? or die "'@args' returned non-zero return code";
+
+    my $patch_name = "";
+    ($patch_name = $patch_subject) =~ s/\r|\n//g;
+    ($patch_name = $patch_name) =~ s/ /-/g;
+    @args = ("dpkg-source", "--commit", "--auto-commit",
+        ".", "$patch_name", "$patch_file");
+    0 == system(@args) or die "'@args' returned non-zero return code";
+}
+closedir $dh;
 
 # Build package
-debuild -us -uc || exit 1
+@args = ("debuild", "-us", "-uc");
+0 == system(@args) or die "'@args' returned non-zero return code";
 
-exit 0
+exit 0;
