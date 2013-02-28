@@ -60,7 +60,7 @@ while(readdir $dh) {
     print $patch_subject;
     print $patch_body;
 
-    @args = ("patch", "-p1");
+    @args = ("patch", "-p1"); # pass patch_file in via stdin
     run3 \@args, "$patch_file" or die $!;
     0 == $? or die "'@args' returned non-zero return code";
 
