@@ -69,6 +69,7 @@ for my $file (@files) {
     my $patch_name = "";
     ($patch_name = $patch_subject) =~ s/\r|\n//g;
     ($patch_name = $patch_name) =~ s/ /-/g;
+    ($patch_name = $patch_name) =~ s#[^a-zA-Z0-9_-]#_#g;
     # @arg style calls don't play nice with ENV vars
     # /bin/true is acting as a non-interactive editor
     my $cmd = "EDITOR=/bin/true \\
