@@ -36,10 +36,12 @@ chdir $source_path;
 # Apply patches
 my $count = 0;
 opendir($dh, $PATCHES) or die $!;
-while(readdir $dh) {
-    next unless $_ =~ /\.patch$/;
+my @files = sort readdir $dh;
+closedir $dh;
+for my $file (@files) {
+    next unless $file =~ /\.patch$/;
 
-    my $patch_file = $_;
+    my $patch_file = $file;
     my $patch_subject = "";
     my $patch_body = "";
 
@@ -76,7 +78,6 @@ while(readdir $dh) {
     $cmd = "$DCHENV dch -n \"$patch_subject\n$patch_body\"";
     0 == system($cmd) or die "'$cmd' returned non-zero return code";
 }
-closedir $dh;
 my $cmd = "$DCHENV dch -r \"\""; # non-interactive promotion to unstable
 0 == system($cmd) or die "'$cmd' returned non-zero return code";
 
