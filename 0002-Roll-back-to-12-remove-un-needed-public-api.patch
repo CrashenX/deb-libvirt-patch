@@ -1,0 +1,30 @@
+From 6588170b5f73b90d22b8a0bbe7e33a830ee13102 Mon Sep 17 00:00:00 2001
+From: Jeff Croxell <jcroxell@camber.com>
+Date: Mon, 3 Jun 2013 14:00:33 -0500
+Subject: [PATCH 2/2] Roll back to 12, remove un-needed public api
+
+---
+ src/libvirt_public.syms |    5 +----
+ 1 file changed, 1 insertion(+), 4 deletions(-)
+
+diff --git a/src/libvirt_public.syms b/src/libvirt_public.syms
+index ea49a68..7f48248 100644
+--- a/src/libvirt_public.syms
++++ b/src/libvirt_public.syms
+@@ -534,12 +534,9 @@ LIBVIRT_0.9.11 {
+         virDomainPMWakeup;
+ } LIBVIRT_0.9.10;
+ 
+-LIBVIRT_0.9.13 {
++LIBVIRT_0.9.12 {
+     global:
+         virConnectListAllDomains;
+-        virDomainSnapshotHasMetadata;
+-        virDomainSnapshotIsCurrent;
+-        virDomainSnapshotRef;
+ } LIBVIRT_0.9.11;
+ 
+ # .... define new API here using predicted next version number ....
+-- 
+1.7.10.4
+

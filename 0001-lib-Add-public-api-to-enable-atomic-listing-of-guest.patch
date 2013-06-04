@@ -1,0 +1,328 @@
+From f513a488fc11569b6caed9c50fa7b13e321a1b96 Mon Sep 17 00:00:00 2001
+From: Peter Krempa <pkrempa@redhat.com>
+Date: Fri, 18 May 2012 17:22:02 +0200
+Subject: [PATCH 1/2] lib: Add public api to enable atomic listing of guest
+
+This patch adds a new public api that lists domains. The new approach is
+different from those used before. There are key points to this:
+
+1) The list is acquired atomically and contains both active and inactive
+domains (guests). This eliminates the need to call two different list
+APIs, where the state might change in between the calls.
+
+2) The returned list consists of virDomainPtrs instead of names or ID's
+that have to be converted to virDomainPtrs anyways using separate calls
+for each one of them. This is more convenient and saves hypervisor calls.
+
+3) The returned list is auto-allocated. This saves a lot of hassle for
+the users.
+
+4) Built in support for filtering. The API call supports various
+filtering flags that modify the output list according to user needs.
+
+Available filter groups:
+    Domain status:
+    VIR_CONNECT_LIST_DOMAINS_ACTIVE, VIR_CONNECT_LIST_DOMAINS_INACTIVE
+
+    Domain persistence:
+    VIR_CONNECT_LIST_DOMAINS_PERSISTENT,
+    VIR_CONNECT_LIST_DOMAINS_TRANSIENT
+
+    Domain state:
+    VIR_CONNECT_LIST_DOMAINS_RUNNING, VIR_CONNECT_LIST_DOMAINS_PAUSED,
+    VIR_CONNECT_LIST_DOMAINS_SHUTOFF, VIR_CONNECT_LIST_DOMAINS_OTHER
+
+    Existence of managed save image:
+    VIR_CONNECT_LIST_DOMAINS_MANAGEDSAVE,
+    VIR_CONNECT_LIST_DOMAINS_NO_MANAGEDSAVE
+
+    Auto-start option:
+    VIR_CONNECT_LIST_DOMAINS_AUTOSTART,
+    VIR_CONNECT_LIST_DOMAINS_NO_AUTOSTART
+
+    Existence of snapshot:
+    VIR_CONNECT_LIST_DOMAINS_HAS_SNAPSHOT,
+    VIR_CONNECT_LIST_DOMAINS_NO_SNAPSHOT
+
+5) The python binding returns a list of domain objects that is very neat
+to work with.
+
+The only problem with this approach is no support from code generators
+so both RPC code and python bindings had to be written manually.
+
+*include/libvirt/libvirt.h.in: - add API prototype
+                               - clean up whitespace mistakes nearby
+*python/generator.py: - inhibit generation of the bindings for the new
+                        api
+*src/driver.h: - add driver prototype
+               - clean up some whitespace mistakes nearby
+*src/libvirt.c: - add public implementation
+*src/libvirt_public.syms: - export the new symbol
+
+Conflicts:
+	src/libvirt_public.syms
+---
+ include/libvirt/libvirt.h.in |   36 +++++++++++-
+ python/generator.py          |    1 +
+ src/driver.h                 |   11 +++-
+ src/libvirt.c                |  124 +++++++++++++++++++++++++++++++++++++++++-
+ src/libvirt_public.syms      |    8 +++
+ 5 files changed, 173 insertions(+), 7 deletions(-)
+
+diff --git a/include/libvirt/libvirt.h.in b/include/libvirt/libvirt.h.in
+index ac5df95..624a705 100644
+--- a/include/libvirt/libvirt.h.in
++++ b/include/libvirt/libvirt.h.in
+@@ -1751,8 +1751,40 @@ int                     virDomainUndefineFlags   (virDomainPtr domain,
+                                                   unsigned int flags);
+ int                     virConnectNumOfDefinedDomains  (virConnectPtr conn);
+ int                     virConnectListDefinedDomains (virConnectPtr conn,
+-                                                 char **const names,
+-                                                 int maxnames);
++                                                      char **const names,
++                                                      int maxnames);
++/**
++ * virConnectListAllDomainsFlags:
++ *
++ * Flags used to tune which domains are listed by virConnectListAllDomains().
++ * Note that these flags come in groups; if all bits from a group are 0,
++ * then that group is not used to filter results.
++ */
++typedef enum {
++    VIR_CONNECT_LIST_DOMAINS_ACTIVE         = 1 << 0,
++    VIR_CONNECT_LIST_DOMAINS_INACTIVE       = 1 << 1,
++
++    VIR_CONNECT_LIST_DOMAINS_PERSISTENT     = 1 << 2,
++    VIR_CONNECT_LIST_DOMAINS_TRANSIENT      = 1 << 3,
++
++    VIR_CONNECT_LIST_DOMAINS_RUNNING        = 1 << 4,
++    VIR_CONNECT_LIST_DOMAINS_PAUSED         = 1 << 5,
++    VIR_CONNECT_LIST_DOMAINS_SHUTOFF        = 1 << 6,
++    VIR_CONNECT_LIST_DOMAINS_OTHER          = 1 << 7,
++
++    VIR_CONNECT_LIST_DOMAINS_MANAGEDSAVE    = 1 << 8,
++    VIR_CONNECT_LIST_DOMAINS_NO_MANAGEDSAVE = 1 << 9,
++
++    VIR_CONNECT_LIST_DOMAINS_AUTOSTART      = 1 << 10,
++    VIR_CONNECT_LIST_DOMAINS_NO_AUTOSTART   = 1 << 11,
++
++    VIR_CONNECT_LIST_DOMAINS_HAS_SNAPSHOT   = 1 << 12,
++    VIR_CONNECT_LIST_DOMAINS_NO_SNAPSHOT    = 1 << 13,
++} virConnectListAllDomainsFlags;
++
++int                     virConnectListAllDomains (virConnectPtr conn,
++                                                  virDomainPtr **domains,
++                                                  unsigned int flags);
+ int                     virDomainCreate         (virDomainPtr domain);
+ int                     virDomainCreateWithFlags (virDomainPtr domain,
+                                                  unsigned int flags);
+diff --git a/python/generator.py b/python/generator.py
+index 9530867..0b6ac7c 100755
+--- a/python/generator.py
++++ b/python/generator.py
+@@ -453,6 +453,7 @@ skip_function = (
+     'virConnectDomainEventDeregisterAny', # overridden in virConnect.py
+     'virSaveLastError', # We have our own python error wrapper
+     'virFreeError', # Only needed if we use virSaveLastError
++    'virConnectListAllDomains', #overridden in virConnect.py
+ 
+     'virStreamRecvAll', # Pure python libvirt-override-virStream.py
+     'virStreamSendAll', # Pure python libvirt-override-virStream.py
+diff --git a/src/driver.h b/src/driver.h
+index 03d249b..4c41477 100644
+--- a/src/driver.h
++++ b/src/driver.h
+@@ -251,9 +251,13 @@ typedef char *
+                                            const char *domainXml,
+                                            unsigned int flags);
+ typedef int
+-        (*virDrvListDefinedDomains)	(virConnectPtr conn,
+-                                         char **const names,
+-                                         int maxnames);
++        (*virDrvListDefinedDomains) (virConnectPtr conn,
++                                     char **const names,
++                                     int maxnames);
++typedef int
++        (*virDrvListAllDomains) (virConnectPtr conn,
++                                 virDomainPtr **domains,
++                                 unsigned int flags);
+ typedef int
+         (*virDrvNumOfDefinedDomains)	(virConnectPtr conn);
+ typedef int
+@@ -866,6 +870,7 @@ struct _virDriver {
+     virDrvGetCapabilities		getCapabilities;
+     virDrvListDomains		listDomains;
+     virDrvNumOfDomains		numOfDomains;
++    virDrvListAllDomains    listAllDomains;
+     virDrvDomainCreateXML		domainCreateXML;
+     virDrvDomainLookupByID		domainLookupByID;
+     virDrvDomainLookupByUUID	domainLookupByUUID;
+diff --git a/src/libvirt.c b/src/libvirt.c
+index cfd7711..82c43b5 100644
+--- a/src/libvirt.c
++++ b/src/libvirt.c
+@@ -1859,7 +1859,14 @@ error:
+  *
+  * Collect the list of active domains, and store their IDs in array @ids
+  *
+- * Returns the number of domains found or -1 in case of error
++ * For inactive domains, see virConnectListDefinedDomains().  For more
++ * control over the results, see virConnectListAllDomains().
++ *
++ * Returns the number of domains found or -1 in case of error.  Note that
++ * this command is inherently racy; a domain can be started between a
++ * call to virConnectNumOfDomains() and this call; you are only guaranteed
++ * that all currently active domains were listed if the return is less
++ * than @maxids.
+  */
+ int
+ virConnectListDomains(virConnectPtr conn, int *ids, int maxids)
+@@ -8092,7 +8099,14 @@ error:
+  * list the defined but inactive domains, stores the pointers to the names
+  * in @names
+  *
+- * Returns the number of names provided in the array or -1 in case of error
++ * For active domains, see virConnectListDomains().  For more control over
++ * the results, see virConnectListAllDomains().
++ *
++ * Returns the number of names provided in the array or -1 in case of error.
++ * Note that this command is inherently racy; a domain can be defined between
++ * a call to virConnectNumOfDefinedDomains() and this call; you are only
++ * guaranteed that all currently defined domains were listed if the return
++ * is less than @maxids.  The client must call free() on each returned name.
+  */
+ int
+ virConnectListDefinedDomains(virConnectPtr conn, char **const names,
+@@ -8128,6 +8142,112 @@ error:
+ }
+ 
+ /**
++ * virConnectListAllDomains:
++ * @conn: Pointer to the hypervisor connection.
++ * @domains: Pointer to a variable to store the array containing domain objects
++ *           or NULL if the list is not required (just returns number of guests).
++ * @flags: bitwise-OR of virConnectListAllDomainsFlags
++ *
++ * Collect a possibly-filtered list of all domains, and return an allocated
++ * array of information for each.  This API solves the race inherent in
++ * virConnectListDomains() and virConnectListDefinedDomains().
++ *
++ * Normally, all domains are returned; however, @flags can be used to
++ * filter the results for a smaller list of targeted domains.  The valid
++ * flags are divided into groups, where each group contains bits that
++ * describe mutually exclusive attributes of a domain, and where all bits
++ * within a group describe all possible domains.  Some hypervisors might
++ * reject explicit bits from a group where the hypervisor cannot make a
++ * distinction (for example, not all hypervisors can tell whether domains
++ * have snapshots).  For a group supported by a given hypervisor, the
++ * behavior when no bits of a group are set is identical to the behavior
++ * when all bits in that group are set.  When setting bits from more than
++ * one group, it is possible to select an impossible combination (such
++ * as an inactive transient domain), in that case a hypervisor may return
++ * either 0 or an error.
++ *
++ * The first group of @flags is VIR_CONNECT_LIST_DOMAINS_ACTIVE (online
++ * domains) and VIR_CONNECT_LIST_DOMAINS_INACTIVE (offline domains).
++ *
++ * The next group of @flags is VIR_CONNECT_LIST_DOMAINS_PERSISTENT (defined
++ * domains) and VIR_CONNECT_LIST_DOMAINS_TRANSIENT (running but not defined).
++ *
++ * The next group of @flags covers various domain states:
++ * VIR_CONNECT_LIST_DOMAINS_RUNNING, VIR_CONNECT_LIST_DOMAINS_PAUSED,
++ * VIR_CONNECT_LIST_DOMAINS_SHUTOFF, and a catch-all for all other states
++ * (such as crashed, this catch-all covers the possibility of adding new
++ * states).
++ *
++ * The remaining groups cover boolean attributes commonly asked about
++ * domains; they include VIR_CONNECT_LIST_DOMAINS_MANAGEDSAVE and
++ * VIR_CONNECT_LIST_DOMAINS_NO_MANAGEDSAVE, for filtering based on whether
++ * a managed save image exists; VIR_CONNECT_LIST_DOMAINS_AUTOSTART and
++ * VIR_CONNECT_LIST_DOMAINS_NO_AUTOSTART, for filtering based on autostart;
++ * VIR_CONNECT_LIST_DOMAINS_HAS_SNAPSHOT and
++ * VIR_CONNECT_LIST_DOMAINS_NO_SNAPSHOT, for filtering based on whether
++ * a domain has snapshots.
++ *
++ * Returns the number of domains found or -1 and sets domains to NULL in case
++ * of error.  On success, the array stored into @doms is guaranteed to have an
++ * extra allocated element set to NULL but not included in the return count, to
++ * make iteration easier. The caller is responsible for calling virDomainFree()
++ * on each array element, then calling free() on @doms.
++ *
++ * Example of usage:
++ * virDomainPtr *domains;
++ * virDomainPtr dom;
++ * int i;
++ * int ret;
++ * unsigned int flags = VIR_CONNECT_LIST_RUNNING |
++ *                      VIR_CONNECT_LIST_PERSISTENT;
++ *
++ * ret = virConnectListAllDomains(conn, &domains, flags);
++ * if (ret < 0)
++ *     error();
++ *
++ * for (i = 0; i < ret; i++) {
++ *      do_something_with_domain(domains[i]);
++ *
++ *      //here or in a separate loop if needed
++ *      virDomainFree(domains[i]);
++ * }
++ *
++ * free(domains);
++ */
++int
++virConnectListAllDomains(virConnectPtr conn,
++                         virDomainPtr **domains,
++                         unsigned int flags)
++{
++    VIR_DEBUG("conn=%p, domains=%p, flags=%x", conn, domains, flags);
++
++    virResetLastError();
++
++    if (domains)
++        *domains = NULL;
++
++    if (!VIR_IS_CONNECT(conn)) {
++        virLibConnError(VIR_ERR_INVALID_CONN, __FUNCTION__);
++        virDispatchError(NULL);
++        return -1;
++    }
++
++    if (conn->driver->listAllDomains) {
++        int ret;
++        ret = conn->driver->listAllDomains(conn, domains, flags);
++        if (ret < 0)
++            goto error;
++        return ret;
++    }
++
++    virLibConnError(VIR_ERR_NO_SUPPORT, __FUNCTION__);
++
++error:
++    virDispatchError(conn);
++    return -1;
++}
++
++/**
+  * virDomainCreate:
+  * @domain: pointer to a defined domain
+  *
+diff --git a/src/libvirt_public.syms b/src/libvirt_public.syms
+index 46c13fb..ea49a68 100644
+--- a/src/libvirt_public.syms
++++ b/src/libvirt_public.syms
+@@ -534,4 +534,12 @@ LIBVIRT_0.9.11 {
+         virDomainPMWakeup;
+ } LIBVIRT_0.9.10;
+ 
++LIBVIRT_0.9.13 {
++    global:
++        virConnectListAllDomains;
++        virDomainSnapshotHasMetadata;
++        virDomainSnapshotIsCurrent;
++        virDomainSnapshotRef;
++} LIBVIRT_0.9.11;
++
+ # .... define new API here using predicted next version number ....
+-- 
+1.7.10.4
+
